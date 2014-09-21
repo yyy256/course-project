@@ -1,0 +1,92 @@
+---
+title: "Course Project"
+author: "Yaoyu"
+date: "2014年09月21日"
+output: html_document
+---
+### 1. This is a classification question and should use supervised learning methods.
+
+### 2. Look into data  
+- I use `summary(mydata)` find 101 variables are most missing values. I think these variables are not useful, so I delete them and got 58 variables.  
+- These 58 variables should standard
+- I use `sapply(mydata, class)` find "user_name" and "new_window" are factor variables and the other are numeric variables.
+
+### 3. Featuer Extraction  
+- check the similarity between the numeric variables.  
+```{r, eval=FALSE}
+M <- abs(cor(train1[, -c(1,4,58)]))
+diag(M) <- 0
+xg <- which(M > 0.8, arr.ind = T)
+length(unique(dimnames(xg)[[1]]))
+```
+
+I got 22 variables are highly related and use PCA for these variables.  
+```{r, eval=FALSE}
+p <- mydata[, unique(dimnames(xg)[[1]])]
+library(psych)
+fa.parallel(p, fa = "pc", n.iter = 100,
+            show.legend = F, main = "Scree plot with parallel analysis")
+#select 6 factors
+pc<-principal(p, nfactors = 6, score = T, rotate = "varimax")
+scores <- pc$score
+```
+
+- change factor to number
+```{r, eval=FALSE}
+user_name <- factor(train1$user_name,labels=c(1:6))
+new_window <- factor(train1$new_window, labels=c(1:2))
+```
+
+- standardize the  remain variables
+```{r, eval=FALSE}
+standard <- scale(train1[,  !names(mydata) %in% c(unique(dimnames(xg)[[1]]), 'user_name', 'new_window', 'classe')])
+
+```
+
+- combine all the variables
+```{r, eval=FALSE}
+newdf <- data.frame(scores, user_name = user_name, new_window = new_window, standard, classe = mydata$classe)
+```
+
+### 4. Train Model use Radial SVM method
+```{r, eval=FALSE}
+library(caret)
+set.seed(1)
+fitControl <- trainControl(method = "repeatedcv",
+                           number = 3,
+                           repeats = 1,
+                           verboseIter=TRUE)
+modelFit <- train(classes ~.,data=newdf, method="svmRadial", trControl = fitControl, verbose=FALSE)
+```
+### 4. Sample error
+I expect the accuracy above 80%
+The model's results are:
+```{r, eval=FALSE}
+       sigma    C  Accuracy     Kappa  AccuracySD     KappaSD
+1 0.01532849 0.25 0.8586781 0.8212822 0.006818204 0.008471651
+2 0.01532849 0.50 0.8902249 0.8610244 0.005066673 0.006383115
+3 0.01532849 1.00 0.9170819 0.8949800 0.008002848 0.010087883
+```
+I select sigma = 0.0153, C = 1 as tuning parameters
+
+### 5. Predict the test data
+```{r, eval=FALSE}
+(prediction <- predict(modelFit, testdata))
+[1] B A A A A E D B A A B C B A E C A B B B
+Levels: A B C D E
+```
+
+### 6. Submit the answer
+```{r, eval=FALSE}
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+answers <- as.character(prediction)
+pml_write_files(answers)
+```
+
+**The whole code in the [course_project.R](https://github.com/yyy256/course-project/blob/master/course_project.R) file.**
